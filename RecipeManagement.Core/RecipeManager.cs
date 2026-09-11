@@ -8,19 +8,10 @@ public sealed class RecipeManager : IRecipeManager
 {
     // ===== 五种数据结构（私有字段）=====
 
-    // Dictionary：食谱目录，key 是 recipe ID，value 是 Recipe 对象
     private readonly Dictionary<int, Recipe> _recipes;
-
-    // List：购物清单，存储食材字符串
     private readonly List<string> _shoppingList;
-
-    // LinkedList：烹饪计划，存储 recipe ID，按顺序排列
     private readonly LinkedList<int> _cookingPlan;
-
-    // Stack：最近删除的烹饪计划食谱 ID（后进先出）
     private readonly Stack<int> _removedRecipes;
-
-    // Queue：当前烹饪的指令队列（先进先出）
     private readonly Queue<string> _instructionQueue;
 
     private int jsoncount;
@@ -127,20 +118,63 @@ public sealed class RecipeManager : IRecipeManager
 
     // ===== 烹饪计划（LinkedList<int>）+ 删除历史（Stack<int>）=====
 
-    public bool AddRecipeToCookingPlan(int recipeId) =>
-        throw new NotImplementedException();
+    // 添加食谱到烹饪计划末尾
+    public bool AddRecipeToCookingPlan(int recipeId)
+    {
+        // 食谱必须存在
+        if (!_recipes.ContainsKey(recipeId))
+            return false;
 
-    public bool RemoveRecipeFromCookingPlan(int recipeId) =>
-        throw new NotImplementedException();
+        // 不能重复添加
+        if (_cookingPlan.Contains(recipeId))
+            return false;
 
-    public bool RestoreLastRemovedRecipe() =>
-        throw new NotImplementedException();
+        _cookingPlan.AddLast(recipeId);
+        return true;
+    }
 
-    public int? PeekLastRemovedRecipe() =>
-        throw new NotImplementedException();
+    // 从烹饪计划删除，成功则 push 到 Stack
+    public bool RemoveRecipeFromCookingPlan(int recipeId)
+    {
+        if (!_cookingPlan.Contains(recipeId))
+            return false;
 
-    public IReadOnlyList<int> GetCookingPlan() =>
-        throw new NotImplementedException();
+        _cookingPlan.Remove(recipeId);
+        _removedRecipes.Push(recipeId);
+        return true;
+    }
+
+    // 恢复最近删除的食谱到烹饪计划末尾
+    public bool RestoreLastRemovedRecipe()
+    {
+        if (_removedRecipes.Count == 0)
+            return false;
+
+        int recipeId = _removedRecipes.Peek();
+
+        // 食谱必须还存在，且不在烹饪计划中
+        if (!_recipes.ContainsKey(recipeId) || _cookingPlan.Contains(recipeId))
+            return false;
+
+        _removedRecipes.Pop();
+        _cookingPlan.AddLast(recipeId);
+        return true;
+    }
+
+    // 查看最近删除的食谱 ID，不移除
+    public int? PeekLastRemovedRecipe()
+    {
+        if (_removedRecipes.Count == 0)
+            return null;
+
+        return _removedRecipes.Peek();
+    }
+
+    // 返回烹饪计划列表
+    public IReadOnlyList<int> GetCookingPlan()
+    {
+        return new List<int>(_cookingPlan);
+    }
 
     // ===== 烹饪指令（Queue<string>）=====
 
@@ -176,4 +210,3 @@ public sealed class RecipeManager : IRecipeManager
     public IReadOnlyList<int> GetSavedRecipes() =>
         throw new NotImplementedException();
 }
-
