@@ -6,8 +6,6 @@ namespace RecipeManagement.Core;
 
 public sealed class RecipeManager : IRecipeManager
 {
-    // ===== 五种数据结构（私有字段）=====
-
     private readonly Dictionary<int, Recipe> _recipes;
     private readonly List<string> _shoppingList;
     private readonly LinkedList<int> _cookingPlan;
@@ -16,7 +14,6 @@ public sealed class RecipeManager : IRecipeManager
 
     private int jsoncount;
 
-    // ===== 构造函数 =====
     public RecipeManager(IEnumerable<Recipe> recipes)
     {
         if (recipes == null)
@@ -28,43 +25,35 @@ public sealed class RecipeManager : IRecipeManager
         _removedRecipes = new Stack<int>();
         _instructionQueue = new Queue<string>();
 
-        foreach (Recipe recipe in recipes)
+        foreach (var r in recipes)
         {
-            if (recipe.Id <= 0)
+            if (r.Id <= 0)
                 throw new ArgumentException("Recipe ID must be positive.");
-
-            if (string.IsNullOrWhiteSpace(recipe.Title))
+            if (string.IsNullOrWhiteSpace(r.Title))
                 throw new ArgumentException("Recipe title cannot be blank.");
+            if (_recipes.ContainsKey(r.Id))
+                throw new ArgumentException($"Duplicate recipe ID: {r.Id}");
 
-            if (_recipes.ContainsKey(recipe.Id))
-                throw new ArgumentException($"Duplicate recipe ID: {recipe.Id}");
-
-            _recipes.Add(recipe.Id, recipe);
+            _recipes.Add(r.Id, r);
         }
 
         jsoncount = _recipes.Count;
     }
 
-    // ===== 属性 =====
     public int RecipeCount => _recipes.Count;
     public int ShoppingItemCount => _shoppingList.Count;
     public int CookingPlanCount => _cookingPlan.Count;
     public int PendingInstructionCount => _instructionQueue.Count;
     public int RemovedRecipeCount => _removedRecipes.Count;
 
-    // ===== 食谱目录（Dictionary）=====
-
+    // 食谱目录
     public bool AddRecipe(Recipe recipe)
     {
         if (recipe == null)
             throw new ArgumentNullException(nameof(recipe));
 
-        if (recipe.Id <= 0)
+        if (recipe.Id <= 0 || string.IsNullOrWhiteSpace(recipe.Title))
             return false;
-
-        if (string.IsNullOrWhiteSpace(recipe.Title))
-            return false;
-
         if (_recipes.ContainsKey(recipe.Id))
             return false;
 
@@ -74,7 +63,7 @@ public sealed class RecipeManager : IRecipeManager
 
     public Recipe? FindRecipe(int recipeId)
     {
-        _recipes.TryGetValue(recipeId, out Recipe? recipe);
+        _recipes.TryGetValue(recipeId, out var recipe);
         return recipe;
     }
 
@@ -82,7 +71,6 @@ public sealed class RecipeManager : IRecipeManager
     {
         if (!_recipes.ContainsKey(recipeId))
             return false;
-
         if (_cookingPlan.Contains(recipeId))
             return false;
 
@@ -90,18 +78,15 @@ public sealed class RecipeManager : IRecipeManager
         return true;
     }
 
-    // ===== 购物清单（List<string>）=====
-
+    // 购物清单
     public int AddIngredientsToShoppingList(int recipeId)
     {
-        Recipe? recipe = FindRecipe(recipeId);
+        var recipe = FindRecipe(recipeId);
         if (recipe == null)
             return 0;
 
-        foreach (string ingredient in recipe.Ingredients)
-        {
-            _shoppingList.Add(ingredient);
-        }
+        foreach (var ing in recipe.Ingredients)
+            _shoppingList.Add(ing);
 
         return recipe.Ingredients.Count;
     }
@@ -116,16 +101,11 @@ public sealed class RecipeManager : IRecipeManager
         _shoppingList.Clear();
     }
 
-    // ===== 烹饪计划（LinkedList<int>）+ 删除历史（Stack<int>）=====
-
-    // 添加食谱到烹饪计划末尾
+    // 烹饪计划 + 删除历史
     public bool AddRecipeToCookingPlan(int recipeId)
     {
-        // 食谱必须存在
         if (!_recipes.ContainsKey(recipeId))
             return false;
-
-        // 不能重复添加
         if (_cookingPlan.Contains(recipeId))
             return false;
 
@@ -133,7 +113,6 @@ public sealed class RecipeManager : IRecipeManager
         return true;
     }
 
-    // 从烹饪计划删除，成功则 push 到 Stack
     public bool RemoveRecipeFromCookingPlan(int recipeId)
     {
         if (!_cookingPlan.Contains(recipeId))
@@ -144,69 +123,86 @@ public sealed class RecipeManager : IRecipeManager
         return true;
     }
 
-    // 恢复最近删除的食谱到烹饪计划末尾
     public bool RestoreLastRemovedRecipe()
     {
         if (_removedRecipes.Count == 0)
             return false;
 
-        int recipeId = _removedRecipes.Peek();
+        var id = _removedRecipes.Peek();
 
-        // 食谱必须还存在，且不在烹饪计划中
-        if (!_recipes.ContainsKey(recipeId) || _cookingPlan.Contains(recipeId))
+        if (!_recipes.ContainsKey(id) || _cookingPlan.Contains(id))
             return false;
 
         _removedRecipes.Pop();
-        _cookingPlan.AddLast(recipeId);
+        _cookingPlan.AddLast(id);
         return true;
     }
 
-    // 查看最近删除的食谱 ID，不移除
     public int? PeekLastRemovedRecipe()
     {
         if (_removedRecipes.Count == 0)
             return null;
-
         return _removedRecipes.Peek();
     }
 
-    // 返回烹饪计划列表
     public IReadOnlyList<int> GetCookingPlan()
     {
         return new List<int>(_cookingPlan);
     }
 
-    // ===== 烹饪指令（Queue<string>）=====
+    // 烹饪指令队列
+    public bool StartCooking(int recipeId)
+    {
+        var recipe = FindRecipe(recipeId);
+        if (recipe == null || recipe.Instructions.Count == 0)
+            return false;
 
-    public bool StartCooking(int recipeId) =>
-        throw new NotImplementedException();
+        _instructionQueue.Clear();
 
-    public string? PeekNextInstruction() =>
-        throw new NotImplementedException();
+        foreach (var step in recipe.Instructions)
+            _instructionQueue.Enqueue(step);
 
-    public string? CompleteNextInstruction() =>
-        throw new NotImplementedException();
+        return true;
+    }
 
-    // ===== Part B（暂时不用实现）=====
+    public string? PeekNextInstruction()
+    {
+        if (_instructionQueue.Count == 0)
+            return null;
+        return _instructionQueue.Peek();
+    }
 
+    public string? CompleteNextInstruction()
+    {
+        if (_instructionQueue.Count == 0)
+            return null;
+        return _instructionQueue.Dequeue();
+    }
+
+    public int indexer()
+    {
+        var last = 0;
+        foreach (var r in _recipes)
+        {
+            if (r.Key > last)
+                last = r.Key;
+        }
+        return last;
+    }
+
+    // Part B 暂时不用做
     public IReadOnlyList<Recipe> SearchByTitle(string searchText) =>
         throw new NotImplementedException();
-
     public IReadOnlyList<Recipe> SearchByIngredient(string searchText) =>
         throw new NotImplementedException();
-
     public IReadOnlyList<Recipe> GetHighestProteinRecipes(int count) =>
         throw new NotImplementedException();
-
     public bool AddSavedRecipe(int recipeId) =>
         throw new NotImplementedException();
-
     public bool RemoveSavedRecipe(int recipeId) =>
         throw new NotImplementedException();
-
     public bool IsRecipeSaved(int recipeId) =>
         throw new NotImplementedException();
-
     public IReadOnlyList<int> GetSavedRecipes() =>
         throw new NotImplementedException();
 }
