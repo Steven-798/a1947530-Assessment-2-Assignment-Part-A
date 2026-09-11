@@ -1,0 +1,11 @@
+[Dd]ebug/
+[Rr]elease/
+[Bb]in/
+[Oo]bj/
+.vs/
+*.suo
+*.user
+artifacts/
+[Tt]est[Rr]esult*/
+.DS_Store
+Thumbs.db
